@@ -27,7 +27,7 @@ miden-client = { path = "../../../poly-miden-client", features = ["concurrent"] 
 miden-lib = { package = "miden-lib", path = "../../../miden-base/miden-lib" }
 miden-node-proto = { workspace = true }
 miden-node-utils = { workspace = true }
-miden-objects = { package = "miden-objects", path = "../../../miden-base/objects" }
+miden-objects = { package = "miden-objects", git = "https://github.com/0xPolygonMiden/miden-base.git", branch = "mFragaBA-make-client-sendable" }
 rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 tracing = { workspace = true }
