@@ -1,4 +1,8 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{
+    path::PathBuf,
+    sync::Arc,
+};
+use async_mutex::Mutex;
 
 use miden_client::{
     client::{
@@ -30,6 +34,7 @@ pub type FaucetClient = Client<
 pub struct FaucetState {
     pub id: AccountId,
     pub faucet_config: FaucetConfig,
+    pub client: Arc<Mutex<FaucetClient>>,
 }
 
 /// Instatiantes the Miden faucet
@@ -51,6 +56,7 @@ pub async fn build_faucet_state(config: FaucetConfig) -> Result<FaucetState, Fau
     Ok(FaucetState {
         id: faucet_account.id(),
         faucet_config: config,
+        client: Arc::new(Mutex::new(client)),
     })
 }
 
@@ -77,7 +83,7 @@ pub fn build_client(
     let store = SqliteStore::new(store_config)
         .map_err(|err| FaucetError::DatabaseError(err.to_string()))?;
 
-    let store = Rc::new(store);
+    let store = Arc::new(store);
 
     // Setup the tonic rpc client
     let endpoint = Endpoint::try_from(node_url).map_err(|err| {

@@ -14,7 +14,7 @@ use tracing::info;
 
 use crate::{
     errors::FaucetError,
-    utils::{build_client, FaucetState},
+    utils::FaucetState,
 };
 
 #[derive(Deserialize)]
@@ -55,9 +55,6 @@ pub async fn get_tokens(
         return Err(FaucetError::BadRequest("Invalid asset amount.".to_string()).into());
     }
 
-    let client_config = state.faucet_config.clone();
-    let mut client = build_client(client_config.database_filepath, &client_config.node_url)?;
-
     // Receive and hex user account id
     let target_account_id = AccountId::from_hex(req.account_id.as_str())
         .map_err(|err| FaucetError::BadRequest(err.to_string()))?;
@@ -76,22 +73,27 @@ pub async fn get_tokens(
     // Instantiate transaction template
     let tx_template = TransactionTemplate::MintFungibleAsset(asset, target_account_id, note_type);
 
+    let client = state.client.clone();
     // Instantiate transaction request
-    let tx_request = client
+    let tx_request = client.lock().await
         .build_transaction_request(tx_template)
         .map_err(|err| FaucetError::InternalServerError(err.to_string()))?;
 
     // Run transaction executor & execute transaction
-    let tx_result = client
+    let tx_result = client.lock().await
         .new_transaction(tx_request)
         .map_err(|err| FaucetError::InternalServerError(err.to_string()))?;
 
     // Get created notes from transaction result
     let created_notes = tx_result.created_notes().clone();
 
+    let proven_transaction = client.lock().await
+        .prove_transaction(tx_result.executed_transaction().clone())
+        .map_err(|err| FaucetError::InternalServerError(err.to_string()))?;
+
     // Run transaction prover & send transaction to node
-    client
-        .submit_transaction(tx_result)
+    client.lock().await
+        .submit_transaction(tx_result, proven_transaction)
         .await
         .map_err(|err| FaucetError::InternalServerError(err.to_string()))?;
 
@@ -103,7 +105,7 @@ pub async fn get_tokens(
             note_id = note.id();
             InputNoteRecord::from(note.clone()).to_bytes()
         },
-        OutputNote::Header(_) => {
+        OutputNote::Partial(_) | OutputNote::Header(_) => {
             return Err(
                 FaucetError::InternalServerError("Failed to generate note.".to_string()).into()
             )
