@@ -106,7 +106,7 @@ where
         let mut report = err.to_string();
 
         std::iter::successors(err.source(), |child| child.source())
-            .for_each(|source| report.push_str(&format!("\nCaused by: {source}")));
+            .for_each(|source| write!(report, "\nCaused by: {source}").unwrap());
 
         tracing_opentelemetry::OpenTelemetrySpanExt::set_status(
             self,
